@@ -32,7 +32,9 @@ class ProcessCheck(AgentCheck):
         Search for search_string
         """
         found_process_list = []
+        self.log.debug("Browsing the process list, matching with {0}".format(search_string))
         for proc in psutil.process_iter():
+            self.log.debug("Process {0}".format(proc.name()))
             found = False
             for string in search_string:
                 if exact_match:
@@ -50,7 +52,10 @@ class ProcessCheck(AgentCheck):
                     if not found:
                         try:
                             cmdline = proc.cmdline()
+                            self.log.debug("Matching {0} with command line '{1}' ..."
+                                           .format(string, cmdline))
                             if string in ' '.join(cmdline):
+                                self.log.debug("Matched !")
                                 found = True
                         except psutil.NoSuchProcess:
                             self.warning('Process disappeared while scanning')
@@ -96,11 +101,13 @@ class ProcessCheck(AgentCheck):
         got_denied = False
 
         for pid in set(pids):
+            self.log.debug("Getting process metrics from PID {0}".format(pid))
             try:
                 p = psutil.Process(pid)
                 try:
                     if real is not None:
                         mem = p.memory_info_ex()
+                        self.log.debug("Memory info {0}".format(mem))
                         real += mem.rss - mem.shared
                     else:
                         mem = p.memory_info()
@@ -114,6 +121,8 @@ class ProcessCheck(AgentCheck):
                     vms += mem.vms
                     thr += p.num_threads()
                     cpu += p.cpu_percent(cpu_check_interval)
+                    self.log.debug("Thread info {0}".format(thr))
+                    self.log.debug("CPU info {0}".format(cpu))
 
                     if open_file_descriptors is not None:
                         open_file_descriptors += p.num_fds()
@@ -192,6 +201,7 @@ class ProcessCheck(AgentCheck):
         tags.extend(['process_name:%s' % name, name])
 
         self.log.debug('ProcessCheck: process %s analysed' % name)
+        self.log.debug("Found {0} corresponding PIDs".format(len(pids)))
 
         self.gauge('system.processes.number', len(pids), tags=tags)
 
