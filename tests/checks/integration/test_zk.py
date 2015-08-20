@@ -53,7 +53,7 @@ class ZooKeeperTestCase(AgentCheckTest):
         config = {
             'instances': [self.CONFIG]
         }
-        self.run_check(config)
+        self.run_check_twice(config)
 
         # Test metrics
         for mname in self.METRICS:
@@ -67,7 +67,7 @@ class ZooKeeperTestCase(AgentCheckTest):
 
     def test_wrong_expected_mode(self):
         """
-        Raise a 'critical' service check when ZooKeeper is not in the expected mode
+        Raise a 'critical' service check when ZooKeeper is not in the expected mode.
         """
         config = {
             'instances': [self.WRONG_EXPECTED_MODE]
@@ -79,7 +79,7 @@ class ZooKeeperTestCase(AgentCheckTest):
 
     def test_error_state(self):
         """
-        Raise a 'critical' service check when ZooKeeper is in an error state
+        Raise a 'critical' service check when ZooKeeper is in an error state.
         """
         config = {
             'instances': [self.CONNECTION_FAILURE_CONFIG]

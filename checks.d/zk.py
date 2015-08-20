@@ -176,11 +176,11 @@ class ZookeeperCheck(AgentCheck):
 
         # Received: 101032173
         _, value = buf.readline().split(':')
-        metrics.append(ZKMetric('zookeeper.bytes_received', long(value.strip())))
+        metrics.append(ZKMetric('zookeeper.bytes_received', long(value.strip()), "monotonic_count"))
 
         # Sent: 1324
         _, value = buf.readline().split(':')
-        metrics.append(ZKMetric('zookeeper.bytes_sent', long(value.strip())))
+        metrics.append(ZKMetric('zookeeper.bytes_sent', long(value.strip()), "monotonic_count"))
 
         if has_connections_val:
             # Connections: 1
