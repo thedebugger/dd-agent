@@ -1,0 +1,3 @@
+init_config:
+  instances:
+    - gerrit_status_url: http://localhost
