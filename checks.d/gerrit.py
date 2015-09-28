@@ -1,3 +1,7 @@
+import re
+import requests
+import urlparse
+
 from util import headers
 from checks import AgentCheck
 
@@ -10,7 +14,9 @@ class Gerrit(AgentCheck):
         base_url = instance.get('gerrit_status_url')
 
         projects_instance = instance
-        projects_instance['gerrit_status_url'] = base_url + "/projects/"
+        projects_instance['gerrit_status_url'] = base_url + "/projects/?d"
+        response, content_type = self._get_data(projects_instance)
+        self.gauge('gerrit.numberOfProjects', len(response))
 
     def _get_data(self, instance):
         url = instance.get('gerrit_status_url')
@@ -22,7 +28,7 @@ class Gerrit(AgentCheck):
         # Submit a service check for status page availability.
         parsed_url = urlparse.urlparse(url)
         gerrit_host = parsed_url.hostname
-        gerrit_port = parsed_url.port or 80
+        gerrit_port = parsed_url.port or 8080
         service_check_name = 'gerrit.can_connect'
         service_check_tags = ['host:%s' % gerrit_host, 'port:%s' % gerrit_port]
         try:
