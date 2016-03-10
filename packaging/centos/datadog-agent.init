@@ -25,6 +25,7 @@
 AGENTPATH="/opt/datadog-agent/agent/agent.py"
 AGENTCONF="/etc/dd-agent/datadog.conf"
 DOGSTATSDPATH="/opt/datadog-agent/agent/dogstatsd.py"
+KILL_PATH="/opt/datadog-agent/embedded/bin/kill"
 AGENTUSER="dd-agent"
 PIDPATH="/var/run/dd-agent/"
 PROG="datadog-agent"
@@ -35,6 +36,8 @@ SUPERVISORCTL_PATH="/opt/datadog-agent/bin/supervisorctl"
 SUPERVISOR_CONF="/etc/dd-agent/supervisor.conf"
 SUPERVISOR_SOCK="/opt/datadog-agent/run/datadog-supervisor.sock"
 SUPERVISOR_PIDFILE="/opt/datadog-agent/run/datadog-supervisord.pid"
+COLLECTOR_PIDFILE="/opt/datadog-agent/run/dd-agent.pid"
+DD_OPT_PROC_REGEX="dogstatsd|jmxfetch|go-metro"
 
 # Source function library.
 . /etc/rc.d/init.d/functions
@@ -42,18 +45,52 @@ SUPERVISOR_PIDFILE="/opt/datadog-agent/run/datadog-supervisord.pid"
 
 check_status() {
     # run checks to determine if the service is running or use generic status
+    QUERY="all"
+    if [ -n "$1" ] && [ "$1" != "all" ] && [ "$1" != "essential" ] && [ "$1" != "optional" ]; then
+        echo "Valid arguments for $0: all | essential | optional"
+    elif [ -n "$1" ]; then
+        QUERY=$1
+    fi
+
+    ESSENTIAL=0
+    OPTIONAL=0
+    FAIL=1
 
     # if the sock exists, we can use supervisorctl
     if [ -e $SUPERVISOR_SOCK ]; then
 
         s=`$SUPERVISORCTL_PATH -c $SUPERVISOR_CONF status`
 
-        # number of RUNNING supervisord programs (ignoring dogstatsd and jmxfetch)
-	p=`echo "$s" | grep -Ev 'dogstatsd|jmxfetch' | grep -c RUNNING`
+        # number of RUNNING supervisord programs (ignoring dogstatsd, jmxfetch and go-metro)
+        p=`echo "$s" | grep -Ev $DD_OPT_PROC_REGEX | grep -c RUNNING`
 
+        # Number of non-failed OPTIONAL supervisord programs (dogstatsd, jmxfetch and go-metro)
+        p_o=`echo "$s" | grep -E $DD_OPT_PROC_REGEX | grep -cv FATAL`
+:
         # number of expected running supervisord programs (ignoring dogstatsd and jmxfetch)
-	c=`grep -Ev 'dogstatsd|jmxfetch' $SUPERVISOR_CONF | grep -c '\[program:'`
+        c=`grep -Ev $DD_OPT_PROC_REGEX $SUPERVISOR_CONF | grep -c '\[program:'`
+
+        # Number of expected optional supervisord programs (dogstatsd, jmxfetch and go-metro)
+        c_o=`grep -E $DD_OPT_PROC_REGEX $SUPERVISOR_CONF | grep -c '\[program:'`
+
         if [ "$p" -ne "$c" ]; then
+            ESSENTIAL=1
+
+        fi
+
+        if [ "$p_o" -ne "$c_o" ]; then
+            OPTIONAL=1
+        fi
+
+        if [ "$QUERY" = "essential" ] && [ "$ESSENTIAL" -eq 0 ]; then
+            FAIL=0
+        elif [ "$QUERY" = "optional" ] && [ "$OPTIONAL" -eq 0 ]; then
+            FAIL=0
+        elif [ "$QUERY" = "all" ] && [ "$ESSENTIAL" = "$OPTIONAL" ] && [ $ESSENTIAL -eq 0 ]; then
+            FAIL=0
+        fi
+
+        if [ "$FAIL" -gt 0 ]; then
             echo "$s"
             echo -n "Datadog Agent (supervisor) is NOT running all child processes"; failure; echo
             return 1
@@ -84,7 +121,7 @@ check_status() {
 }
 
 grab_status() {
-    GRABSTATUS=`check_status &>/dev/null`
+    GRABSTATUS=`check_status essential &>/dev/null`
 }
 
 start() {
@@ -150,6 +187,11 @@ info() {
     exit $(($FORWARDER_RETURN+$COLLECTOR_RETURN+DOGSTATSD_RETURN))
 }
 
+reload() {
+    $KILL_PATH -HUP `cat $COLLECTOR_PIDFILE`
+    exit $?
+}
+
 configcheck() {
     su $AGENTUSER -c "$AGENTPATH configcheck"
     exit $?
@@ -160,12 +202,15 @@ case "$1" in
     start)
         start
         ;;
+
     stop)
         stop
         ;;
+
     restart)
         restart
         ;;
+
     status)
         # Note: sh does not support arrays
         # Check for kernel version 3.18+ - overlayfs has known bug affecting unix domain sockets
@@ -178,13 +223,22 @@ case "$1" in
             echo "${RED}Warning: Known bug in Linux Kernel 3.18+ causes 'status' to fail.${NC}"
             echo "Calling 'info', instead..."
             service datadog-agent info
+            if [ $? -ne 0 ]; then
+                exit 1
+            fi
         else
             check_status
         fi
         ;;
+
     info)
         info "$@"
         ;;
+
+    reload)
+        reload
+        ;;
+
     configcheck)
         configcheck
         ;;
@@ -206,7 +260,7 @@ case "$1" in
         ;;
 
     *)
-        echo "Usage: $0 {start|stop|restart|info|status|configcheck|configtest|jmx}"
+        echo "Usage: $0 {start|stop|restart|info|status|reload|configcheck|configtest|jmx}"
         exit 2
 esac
 exit $?

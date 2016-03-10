@@ -1,7 +1,7 @@
 # stdlib
+from pprint import pprint
 import inspect
 import os
-from pprint import pprint
 import sys
 
 # datadog

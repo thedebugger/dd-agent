@@ -2,7 +2,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product Name="Datadog Agent" Id="*" UpgradeCode="82210ed1-bbe4-4051-aa15-002ea31dde15"
     Language="1033" Codepage="1252" Version="$(var.AgentVersion)" Manufacturer="Datadog Inc.">
-        <Package Id="*" Keywords="Installer" Description="Datadog Agent Installer"
+        <Package Id="*" Keywords="Installer" Description="Datadog Agent v$(var.AgentVersion)"
           Comments="Copyright 2013 Datadog, Inc." Manufacturer="Datadog Inc."
           InstallerVersion="100" Languages="1033" Compressed="yes" SummaryCodepage="1252" />
 
@@ -17,6 +17,10 @@
         </Upgrade>
 
         <Media Id="1" Cabinet="agent.cab" EmbedCab="yes" />
+
+        <PropertyRef Id="WIX_ACCOUNT_ADMINISTRATORS" />
+        <PropertyRef Id="WIX_ACCOUNT_LOCALSYSTEM" />
+        <PropertyRef Id="WIX_ACCOUNT_USERS" />
 
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFilesFolder">
@@ -101,7 +105,11 @@
 
         <DirectoryRef Id="APPLIDATIONDATADIRECTORY">
             <Component Id="datadog.conf" Guid="83461594-01AC-11E2-BE35-37EC6088709B" NeverOverwrite="yes" Permanent="yes">
-                <File Id="datadog.conf" Name="datadog.conf" Source="$(var.InstallFiles)\datadog_win32.conf"></File>
+                <File Id="datadog.conf" Name="datadog.conf" Source="$(var.InstallFiles)\datadog_win32.conf">
+                    <Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes" />
+                    <Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericAll="yes" />
+                    <Permission User="[WIX_ACCOUNT_USERS]" GenericAll="no"/>
+                </File>
             </Component>
             <Directory Id="logs" Name="logs">
                         <Component Id="logs" Guid="e194d05a-6dc7-40be-a626-6a15b43c456b"
